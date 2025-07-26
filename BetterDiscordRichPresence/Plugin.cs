@@ -173,12 +173,6 @@ public sealed class Plugin : IDalamudPlugin {
         {
             presence.Party = new Party { Size = partySize, Max = 8 };
         }
-
-        // add a button to link to website
-        //presence.Buttons =
-        //[
-        //    new Button { Label = "Test button one", Url = $"https://www.google.com/" },
-        //    new B
         
         // Add buttons based on config
         presence.Buttons = new Button[] { };

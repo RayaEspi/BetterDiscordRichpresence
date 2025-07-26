@@ -140,6 +140,12 @@ public sealed class Plugin : IDalamudPlugin {
             partyString = $" ({partySize} of 8)";
         }
         
+        // Take large image key as image url from config, if not set default to "default"
+        var LargeImageKey = Configuration.ImageUrl;
+        if (string.IsNullOrEmpty(LargeImageKey))
+        {
+            LargeImageKey = "default";
+        }
         var presence = new RichPresence
         {
             Details = $"{character.Name} {partyString}",
@@ -148,7 +154,7 @@ public sealed class Plugin : IDalamudPlugin {
             Assets = new Assets
             {
                 //LargeImageKey = territoryImageKey,
-                LargeImageKey = "default",
+                LargeImageKey = LargeImageKey,
                 LargeImageText = territoryName,
                 //SmallImageKey = GetJobIcon(character.ClassJob.RowId),
                 //SmallImageKey = "default",

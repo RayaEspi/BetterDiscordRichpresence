@@ -60,11 +60,6 @@ public sealed class Plugin : IDalamudPlugin {
         ClientState.TerritoryChanged += OnTerritoryChanged;
         ClientState.Login += OnLogin;
         ClientState.Logout += OnLogout;
-        
-        //discord = new Discord.Discord(
-        //    1398478033429598268, 
-        //    (ulong)CreateFlags.Default
-        //);
 
         Log.Information($"===A cool log message from {PluginInterface.Manifest.Name}===");
     }
@@ -175,10 +170,10 @@ public sealed class Plugin : IDalamudPlugin {
         }
         
         // Add buttons based on config
-        presence.Buttons = new Button[] { };
+        var buttons = new List<Button>();
         if (Configuration.Enabled)
         {
-            presence.Buttons.Add(new Button
+            buttons.Add(new Button
             {
                 Label = Configuration.Text,
                 Url = Configuration.Link
@@ -186,12 +181,13 @@ public sealed class Plugin : IDalamudPlugin {
         }
         if (Configuration.Enabled2)
         {
-            presence.Buttons.Add(new Button
+            buttons.Add(new Button
             {
                 Label = Configuration.Text2,
                 Url = Configuration.Link2
             });
         }
+        presence.Buttons = buttons.ToArray();
 
         Log.Information("========== UpdateRichPresence Done ==========");
         discordClient.SetPresence(presence);

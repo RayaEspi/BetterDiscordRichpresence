@@ -19,6 +19,13 @@
 - Final Fantasy XIV with the **Dalamud** framework.
 - **ECommons v3.0.0.6** (already bundled).
 - A Discord application ID with uploaded assets.
+### Setting up your Discord application
+
+1. Open <https://discord.com/developers/applications> and click **New Application**.
+2. Give it any name and confirm to create the app.
+3. Under **Rich Presence → Art Assets** upload the images you want to show.
+4. From **General Information** copy the **Application ID**.
+5. Enter that ID in the plugin's **Discord Application ID** field and use your uploaded image keys for the large image option.
 
 ---
 

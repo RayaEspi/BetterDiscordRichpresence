@@ -1,282 +1,195 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using System.Linq;
 using Dalamud.Game.Command;
 using Dalamud.IoC;
-using Dalamud.Plugin;
-using System.Linq;
 using Dalamud.Interface.Windowing;
+using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
-using BetterDiscordRichPresence.Windows;
+using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Objects;
-using DiscordRPC;
-using FFXIVClientStructs.FFXIV.Client.Game.Group;
 using Lumina.Excel;
 using Lumina.Excel.Sheets;
-using ECommons;
+using DiscordRPC;
+using FFXIVClientStructs.FFXIV.Client.Game.Group;
+using BetterDiscordRichPresence.Windows;
 
-namespace BetterDiscordRichPresence;
-
-public sealed class Plugin : IDalamudPlugin {
-    [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
-    [PluginService] internal static ITextureProvider TextureProvider { get; private set; } = null!;
-    [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
-    [PluginService] internal static IClientState ClientState { get; private set; } = null!;
-    [PluginService] internal static ITargetManager TargetManager { get; private set; } = null!;
-    [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
-    [PluginService] internal static IPluginLog Log { get; private set; } = null!;
-
-    private const string CommandName = "/drp";
-
-    public Configuration Configuration { get; init; }
-
-    public readonly WindowSystem WindowSystem = new("BetterDiscordRichPresence");
-    private ConfigWindow ConfigWindow { get; init; }
-    private DiscordRpcClient? discordClient;
-    private DateTime startTime;
-    
-    private bool pendingTerritoryUpdate = false;
-    private DateTime territoryUpdateTime;
-
-    private ExcelSheet<TerritoryType>? Territories { get; set; }
-    //private Discord.Discord discord;
-
-    public Plugin()
+namespace BetterDiscordRichPresence
+{
+    public sealed class Plugin : IDalamudPlugin
     {
-        Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        public string Name => PluginInterface.Manifest.Name;
 
-        ConfigWindow = new ConfigWindow(this);
+        [PluginService] internal static IDalamudPluginInterface PluginInterface { get; set; } = null!;
+        [PluginService] private static ICommandManager CommandManager { get; set; } = null!;
+        [PluginService] private static IClientState ClientState { get; set; } = null!;
+        [PluginService] private static IDataManager DataManager { get; set; } = null!;
 
-        WindowSystem.AddWindow(ConfigWindow);
+        private const string CommandName = "/drp";
 
-        CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
+        public Configuration Configuration { get; }
+        private readonly WindowSystem windowSystem = new("BetterDiscordRichPresence");
+        private readonly ConfigWindow configWindow;
+        private DiscordRpcClient? discordClient;
+        private DateTime startTime;
+        private bool pendingTerritoryUpdate;
+        private DateTime territoryUpdateTime;
+        private ExcelSheet<TerritoryType>? territories;
+
+        public Plugin()
         {
-            HelpMessage = "Open Discord Rich Presence configuration"
-        });
+            Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+            configWindow = new ConfigWindow(this);
+            windowSystem.AddWindow(configWindow);
 
-        PluginInterface.UiBuilder.Draw += DrawUI;
-        PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUI;
-
-        ClientState.TerritoryChanged += OnTerritoryChanged;
-        ClientState.Login += OnLogin;
-        ClientState.Logout += OnLogout;
-
-        Log.Information($"===A cool log message from {PluginInterface.Manifest.Name}===");
-    }
-
-    private void InitializeDiscord()
-    {
-        Log.Information("Initializing Discord Rich Presence client...");
-        // Initialize Discord RPC client
-        // Get app id from config
-        var appId = Configuration.DiscordApp;
-        discordClient = new DiscordRpcClient(appId);
-        discordClient.Initialize();
-        startTime = DateTime.UtcNow;
-    }
-
-    private void OnLogin()
-    {
-        startTime = DateTime.UtcNow;
-        UpdateRichPresence();
-    }
-
-    private async void OnTerritoryChanged(ushort _)
-    {
-        pendingTerritoryUpdate = true;
-        territoryUpdateTime = DateTime.UtcNow.AddSeconds(5);
-    }
-
-    private void UpdateRichPresence()
-    {
-        Log.Information("========== UpdateRichPresence Start ==========");
-        // Debug log !ClientState.IsLoggedIn || discordClient is null || !discordClient.IsInitialized
-        if (discordClient is null)
-        {
-            Log.Information("Discord client is null, initializing...");
-            InitializeDiscord();
-        }
-        else if (!discordClient.IsInitialized)
-        {
-            Log.Information("Discord client is not initialized, initializing...");
-            InitializeDiscord();
-        }
-        else
-        {
-            Log.Information("Discord client is already initialized.");
-        }
-        
-        if (!ClientState.IsLoggedIn || discordClient is null || !discordClient.IsInitialized)
-            return;
-
-        Log.Information("========== UpdateRichPresence Localplayer ==========");
-        var character = ClientState.LocalPlayer;
-        if (character is null) return;
-
-
-        Log.Information("========== UpdateRichPresence Get info ==========");
-        Territories = DataManager.GetExcelSheet<TerritoryType>();
-        var territory = Territories?.GetRow(ClientState.TerritoryType);
-        var placeName = territory.ToString() == "Unknown location";
-        //var placeName  = territory?.PlaceName.Value?.Name?.ToString() ?? "Unknown Location";
-        
-        var territoryId = ClientState.TerritoryType;
-        var territoryResolver = Territories.First(row => row.RowId == territoryId);
-        string territoryName = (territory?.PlaceName.Value.Name).ToString() ?? "Unknown Location";
-        var territoryImageKey = $"li_{territoryResolver.LoadingImage}";
-
-        Log.Information($"========== Territory {territoryName} ==========");
-        
-        Log.Information("========== UpdateRichPresence New presence ==========");
-        var partySize = GetPartySize();
-        var partyString = "";
-        if (partySize > 1)
-        {
-            partyString = $" ({partySize} of 8)";
-        }
-        
-        // Take large image key as image url from config, if not set default to "default"
-        var LargeImageKey = Configuration.ImageUrl;
-        if (string.IsNullOrEmpty(LargeImageKey))
-        {
-            LargeImageKey = "default";
-        }
-        var presence = new RichPresence
-        {
-            Details = $"{character.Name} {partyString}",
-            State = ClientState.LocalPlayer.CurrentWorld.ToString() ?? "Menu",
-            //State   = $"Level {character.Level} {character.ClassJob.GameData?.Name ?? "Unknown Job"}",
-            Assets = new Assets
+            CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
             {
-                //LargeImageKey = territoryImageKey,
-                LargeImageKey = LargeImageKey,
-                LargeImageText = territoryName,
-                //SmallImageKey = GetJobIcon(character.ClassJob.RowId),
-                //SmallImageKey = "default",
-                //SmallImageText = ClientState.LocalPlayer.ClassJob.ToString() ?? "Final Fantasy XIV"
-            },
-            // Set the start time to the current UTC time
-            
-            Timestamps = new Timestamps { Start = DateTime.UtcNow }
-        };
-        Log.Information($"========== {startTime} - {DateTime.Now} ==========");
-
-        if (!placeName)
-            presence.State = $"In {territoryName}";
-
-        if (partySize > 1)
-        {
-            presence.Party = new Party { Size = partySize, Max = 8 };
-        }
-        
-        // Add buttons based on config
-        var buttons = new List<Button>();
-        if (Configuration.Enabled)
-        {
-            buttons.Add(new Button
-            {
-                Label = Configuration.Text,
-                Url = Configuration.Link
+                HelpMessage = "Open Discord Rich Presence configuration"
             });
+
+            PluginInterface.UiBuilder.Draw += DrawUI;
+            PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUI;
+
+            ClientState.TerritoryChanged += OnTerritoryChanged;
+            ClientState.Login           += OnLogin;
+            ClientState.Logout          += OnLogout;
         }
-        if (Configuration.Enabled2)
+
+        public void Dispose()
         {
-            buttons.Add(new Button
+            windowSystem.RemoveAllWindows();
+            configWindow.Dispose();
+            CommandManager.RemoveHandler(CommandName);
+
+            if (discordClient != null)
             {
-                Label = Configuration.Text2,
-                Url = Configuration.Link2
-            });
-        }
-        presence.Buttons = buttons.ToArray();
+                discordClient.ClearPresence();
+                discordClient.Dispose();
+            }
 
-        Log.Information("========== UpdateRichPresence Done ==========");
-        discordClient.SetPresence(presence);
-    }
-
-    private void OnLogout(int type, int code)
-    {
-        if (discordClient != null && discordClient.IsInitialized)
-        {
-            discordClient.ClearPresence();
-        }
-    }
-
-    public void Dispose()
-    {
-        WindowSystem.RemoveAllWindows();
-        ConfigWindow.Dispose();
-        CommandManager.RemoveHandler(CommandName);
-
-        if (discordClient != null)
-        {
-            discordClient.ClearPresence();
-            discordClient.Dispose();
+            ClientState.TerritoryChanged -= OnTerritoryChanged;
+            ClientState.Login           -= OnLogin;
+            ClientState.Logout          -= OnLogout;
         }
 
-        ClientState.TerritoryChanged -= OnTerritoryChanged;
-        ClientState.Login -= OnLogin;
-        ClientState.Logout -= OnLogout;
-    }
-
-    private void OnCommand(string command, string args) {
-        UpdateRichPresence();
-    }
-
-    private void DrawUI()
-    {
-        if (pendingTerritoryUpdate && DateTime.UtcNow >= territoryUpdateTime)
+        private void InitializeDiscord()
         {
-            pendingTerritoryUpdate = false;
+            discordClient = new DiscordRpcClient(Configuration.DiscordApp);
+            discordClient.Initialize();
+            startTime = DateTime.UtcNow;
+        }
+
+        private void OnLogin()
+        {
+            startTime = DateTime.UtcNow;
             UpdateRichPresence();
         }
-        WindowSystem.Draw();
-    }
 
-    public void ToggleConfigUI() => ConfigWindow.Toggle();
-
-    private string GetJobIcon(uint jobId)
-    {
-        // Map job IDs to Discord asset keys
-        return jobId switch
+        private async void OnTerritoryChanged(ushort _)
         {
-            1 => "gladiator",
-            2 => "pugilist",
-            3 => "marauder",
-            4 => "lancer",
-            5 => "archer",
-            6 => "conjurer",
-            7 => "thaumaturge",
-            19 => "paladin",
-            20 => "monk",
-            21 => "warrior",
-            22 => "dragoon",
-            23 => "bard",
-            24 => "whitemage",
-            25 => "blackmage",
-            26 => "arcanist",
-            27 => "summoner",
-            28 => "scholar",
-            30 => "ninja",
-            31 => "machinist",
-            32 => "darkknight",
-            33 => "astrologian",
-            34 => "samurai",
-            35 => "redmage",
-            36 => "bluemage",
-            37 => "gunbreaker",
-            38 => "dancer",
-            39 => "reaper",
-            40 => "sage",
-            _ => "adventurer"
+            pendingTerritoryUpdate = true;
+            territoryUpdateTime     = DateTime.UtcNow.AddSeconds(5);
+        }
+
+        private void DrawUI()
+        {
+            if (pendingTerritoryUpdate && DateTime.UtcNow >= territoryUpdateTime)
+            {
+                pendingTerritoryUpdate = false;
+                UpdateRichPresence();
+            }
+            windowSystem.Draw();
+        }
+
+        public void ToggleConfigUI() => configWindow.Toggle();
+
+        private void OnCommand(string command, string args)
+            => UpdateRichPresence();
+
+        private void OnLogout(int type, int code)
+        {
+            if (discordClient?.IsInitialized == true)
+                discordClient.ClearPresence();
+        }
+
+        private void UpdateRichPresence()
+        {
+            if (discordClient == null || !discordClient.IsInitialized)
+                InitializeDiscord();
+
+            if (!ClientState.IsLoggedIn || discordClient == null || !discordClient.IsInitialized)
+                return;
+
+            var character = ClientState.LocalPlayer;
+            if (character == null)
+                return;
+
+            territories ??= DataManager.GetExcelSheet<TerritoryType>();
+            var territory       = territories.GetRow(ClientState.TerritoryType);
+            string territoryName = territory.ToString() ?? "Unknown Location";
+            int partySize       = GetPartySize();
+            string partyString  = partySize > 1 ? $" ({partySize} of 8)" : string.Empty;
+
+            // Use zone-specific image if configured for this territory
+            var zoneMatch = Configuration.ZoneImages
+                .FirstOrDefault(z => z.Enabled && string.Equals(z.Area, territoryName, StringComparison.OrdinalIgnoreCase));
+            string imageKey;
+            if (zoneMatch != null && !string.IsNullOrEmpty(zoneMatch.ImageUrl))
+            {
+                imageKey = zoneMatch.ImageUrl;
+            }
+            else if (!string.IsNullOrEmpty(Configuration.ImageUrl))
+            {
+                imageKey = Configuration.ImageUrl;
+            }
+            else
+            {
+                imageKey = "default";
+            }
+
+            var presence = new RichPresence
+            {
+                Details    = $"{character.Name}{partyString}",
+                State      = !string.IsNullOrEmpty(territoryName)
+                               ? $"In {territoryName}"
+                               : character.CurrentWorld.ToString(),
+                Assets     = new Assets
+                {
+                    LargeImageKey  = imageKey,
+                    LargeImageText = territoryName
+                },
+                Timestamps = new Timestamps { Start = startTime }
+            };
+
+            var buttons = new List<Button>();
+            if (Configuration.Enabled)
+                buttons.Add(new Button { Label = Configuration.Text,  Url = Configuration.Link });
+            if (Configuration.Enabled2)
+                buttons.Add(new Button { Label = Configuration.Text2, Url = Configuration.Link2 });
+            presence.Buttons = buttons.ToArray();
+
+            discordClient.SetPresence(presence);
+        }
+
+        private string GetJobIcon(uint jobId) => jobId switch
+        {
+            1  => "gladiator",  2  => "pugilist", 3  => "marauder", 4  => "lancer",
+            5  => "archer",     6  => "conjurer", 7  => "thaumaturge",19 => "paladin",
+            20 => "monk",       21 => "warrior",  22 => "dragoon",   23 => "bard",
+            24 => "whitemage",  25 => "blackmage",26 => "arcanist",  27 => "summoner",
+            28 => "scholar",    30 => "ninja",    31 => "machinist",32 => "darkknight",
+            33 => "astrologian",34 => "samurai",  35 => "redmage",   36 => "bluemage",
+            37 => "gunbreaker", 38 => "dancer",   39 => "reaper",    40 => "sage",
+            _  => "adventurer"
         };
-    }
 
-    private int GetPartySize()
-    {
-        unsafe
+        private int GetPartySize()
         {
-            var partyManager = GroupManager.Instance();
-            return partyManager->MainGroup.MemberCount;
+            unsafe
+            {
+                var partyManager = GroupManager.Instance();
+                return partyManager->MainGroup.MemberCount;
+            }
         }
     }
 }

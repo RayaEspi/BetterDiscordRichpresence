@@ -1,32 +1,44 @@
-﻿using Dalamud.Configuration;
+﻿using System;
+using System.Collections.Generic;
+using Dalamud.Configuration;
 using Dalamud.Plugin;
 
-namespace BetterDiscordRichPresence;
-public class Configuration : IPluginConfiguration
+namespace BetterDiscordRichPresence
 {
-    public int Version { get; set; } = 0;
-
-    public bool   Enabled { get; set; } = true;
-    public string Text    { get; set; } = string.Empty;
-    public string Link    { get; set; } = string.Empty;
-
-    public bool   Enabled2 { get; set; } = true;
-    public string Text2    { get; set; } = string.Empty;
-    public string Link2    { get; set; } = string.Empty;
-    public string ImageUrl { get; set; } = string.Empty;
-    public string DiscordApp { get; set; } = string.Empty;
-    
-    
-    // Array of options
-    public string[] Options { get; set; } = new string[]
+    // Represents a single zone-specific image entry
+    public class ZoneImage
     {
-        "Option 1",
-        "Option 2",
-        "Option 3"
-    };
+        public bool   Enabled  { get; set; } = true;
+        public string Area     { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
+    }
 
-    public void Save()
+    // Plugin configuration storage
+    public class Configuration : IPluginConfiguration
     {
-        Plugin.PluginInterface.SavePluginConfig(this);
+        public int Version { get; set; } = 0;
+
+        // Primary button settings
+        public bool   Enabled  { get; set; } = true;
+        public string Text     { get; set; } = string.Empty;
+        public string Link     { get; set; } = string.Empty;
+
+        // Secondary button settings
+        public bool   Enabled2 { get; set; } = true;
+        public string Text2    { get; set; } = string.Empty;
+        public string Link2    { get; set; } = string.Empty;
+
+        // Default image URL for rich presence
+        public string ImageUrl    { get; set; } = string.Empty;
+
+        // Discord application ID for rich presence
+        public string DiscordApp { get; set; } = string.Empty;
+
+        // Collection of zone-specific image entries
+        public List<ZoneImage> ZoneImages { get; set; } = new List<ZoneImage>();
+
+        // Saves the current configuration to disk
+        public void Save()
+            => Plugin.PluginInterface.SavePluginConfig(this);
     }
 }

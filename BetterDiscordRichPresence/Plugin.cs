@@ -161,7 +161,7 @@ namespace BetterDiscordRichPresence
             var presence = new RichPresence
             {
                 Details    = $"{character.Name}{partyString}",
-                State      = territoryName,
+                State      = $"in {territoryName}",
                 Assets     = new Assets
                 {
                     LargeImageKey  = imageKey,

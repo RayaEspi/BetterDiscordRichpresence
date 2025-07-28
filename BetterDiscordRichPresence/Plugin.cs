@@ -24,6 +24,7 @@ namespace BetterDiscordRichPresence
         [PluginService] private static ICommandManager CommandManager { get; set; } = null!;
         [PluginService] private static IClientState ClientState { get; set; } = null!;
         [PluginService] private static IDataManager DataManager { get; set; } = null!;
+        [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
         private const string CommandName = "/drp";
 
@@ -126,13 +127,23 @@ namespace BetterDiscordRichPresence
 
             territories ??= DataManager.GetExcelSheet<TerritoryType>();
             var territory       = territories.GetRow(ClientState.TerritoryType);
-            string territoryName = territory.ToString() ?? "Unknown Location";
+            var territoryId = ClientState.TerritoryType;
+            var territoryResolver = territories.First(row => row.RowId == territoryId);
+            string territoryName = (territory.PlaceName.Value.Name).ToString() ?? "Unknown Location";
             int partySize       = GetPartySize();
             string partyString  = partySize > 1 ? $" ({partySize} of 8)" : string.Empty;
 
             // Use zone-specific image if configured for this territory
-            var zoneMatch = Configuration.ZoneImages
-                .FirstOrDefault(z => z.Enabled && string.Equals(z.Area, territoryName, StringComparison.OrdinalIgnoreCase));
+            foreach (var z in Configuration.ZoneImages)
+            {
+                Log.Information($"Checking ZoneImage: z.Area={z.Area}, territoryName={territoryName}, Enabled={z.Enabled}");
+            } 
+            
+            var zoneMatch = FindZoneMatch(territoryName);
+            
+            // Log all values in zoneMatch for debugging
+            Log.Information($"ZoneMatch: {zoneMatch?.Area}, ImageUrl: {zoneMatch?.ImageUrl}, Enabled: {zoneMatch?.Enabled}");
+            
             string imageKey;
             if (zoneMatch != null && !string.IsNullOrEmpty(zoneMatch.ImageUrl))
             {
@@ -150,9 +161,7 @@ namespace BetterDiscordRichPresence
             var presence = new RichPresence
             {
                 Details    = $"{character.Name}{partyString}",
-                State      = !string.IsNullOrEmpty(territoryName)
-                               ? $"In {territoryName}"
-                               : character.CurrentWorld.ToString(),
+                State      = territoryName,
                 Assets     = new Assets
                 {
                     LargeImageKey  = imageKey,
@@ -190,6 +199,25 @@ namespace BetterDiscordRichPresence
                 var partyManager = GroupManager.Instance();
                 return partyManager->MainGroup.MemberCount;
             }
+        }
+        
+        private ZoneImage? FindZoneMatch(object territoryNameObj)
+        {
+            // Convert the incoming territoryName into an ordinary string
+            string territoryName = territoryNameObj?.ToString() ?? string.Empty;
+
+            foreach (var z in Configuration.ZoneImages)
+            {
+                Log.Information($"Checking ZoneImage: Area={z.Area}, TerritoryName={territoryName}, Enabled={z.Enabled}");
+                if (z.Enabled && string.Equals(z.Area, territoryName, StringComparison.OrdinalIgnoreCase))
+                {
+                    Log.Information($"Zone match found: {z.Area}");
+                    return z;
+                }
+            }
+
+            Log.Information($"No zone match found for TerritoryName: {territoryName}");
+            return null;
         }
     }
 }

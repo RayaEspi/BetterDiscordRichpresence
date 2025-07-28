@@ -167,7 +167,8 @@ namespace BetterDiscordRichPresence
                     LargeImageKey  = imageKey,
                     LargeImageText = territoryName
                 },
-                Timestamps = new Timestamps { Start = startTime }
+                
+                Timestamps = new Timestamps { Start = DateTime.UtcNow  },
             };
 
             var buttons = new List<Button>();

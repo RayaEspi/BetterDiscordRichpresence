@@ -34,7 +34,7 @@ namespace BetterDiscordRichPresence.Windows
             {
                 if (ImGui.BeginTabItem("General"))
                 {
-                    DrawDiscordSettings();
+                    DrawGeneralSettings();
                     ImGui.EndTabItem();
                 }
 
@@ -178,13 +178,52 @@ namespace BetterDiscordRichPresence.Windows
         }
 
         // Renders the Discord application ID field
-        private void DrawDiscordSettings()
+        private void DrawGeneralSettings()
         {
             ImGui.Text("Discord Configuration");
             ImGui.SameLine();
             var discordApp = configuration.DiscordApp ?? string.Empty;
             if (ImGui.InputText("##bd_discord_app", ref discordApp, 512))
                 UpdateConfig(() => configuration.DiscordApp = discordApp);
+            
+            ImGui.Separator();
+            ImGui.Text("SBJ Integration");
+            
+            if (!ImGui.BeginTable("sbjIPC", 4, ImGuiTableFlags.SizingStretchProp))
+                return;
+
+            ImGui.TableSetupColumn("Label", ImGuiTableColumnFlags.WidthFixed, 90f);
+            ImGui.TableSetupColumn("Value1");
+            ImGui.TableSetupColumn("Value2");
+            ImGui.TableSetupColumn("Value3");
+
+            // Button 1
+            ImGui.TableNextRow();
+            ImGui.TableSetColumnIndex(0);
+            var isEnabled1 = configuration.Enabled;
+            if (ImGui.Checkbox("##bd_enabled1", ref isEnabled1))
+                UpdateConfig(() => configuration.SbjEnabled = isEnabled1);
+            ImGui.SameLine(); ImGui.TextDisabled("Enabled");
+            
+            ImGui.TableSetColumnIndex(1);
+            var imgurl = configuration.Text ?? string.Empty;
+            if (ImGui.InputText("##bd_text1", ref imgurl, 512))
+                UpdateConfig(() => configuration.SbjImg = imgurl);
+            ImGui.SameLine(); ImGui.TextDisabled("Image URL");
+
+            ImGui.TableSetColumnIndex(2);
+            var text = configuration.Text ?? string.Empty;
+            if (ImGui.InputText("##bd_text1", ref text, 512))
+                UpdateConfig(() => configuration.SbjText = text);
+            ImGui.SameLine(); ImGui.TextDisabled("Text");
+
+            ImGui.TableSetColumnIndex(3);
+            var location = configuration.Link ?? string.Empty;
+            if (ImGui.InputText("##bd_link1", ref location, 512))
+                UpdateConfig(() => configuration.SbjLocation = location);
+            ImGui.SameLine(); ImGui.TextDisabled("Location");
+
+            ImGui.EndTable();
         }
 
         // Saves configuration changes and persists to storage

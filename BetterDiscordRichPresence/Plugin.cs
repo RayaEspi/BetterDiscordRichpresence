@@ -13,6 +13,7 @@ using Lumina.Excel.Sheets;
 using DiscordRPC;
 using FFXIVClientStructs.FFXIV.Client.Game.Group;
 using BetterDiscordRichPresence.Windows;
+using ECommons;
 
 namespace BetterDiscordRichPresence
 {
@@ -26,6 +27,7 @@ namespace BetterDiscordRichPresence
         [PluginService] private static IDataManager DataManager { get; set; } = null!;
         [PluginService] internal static IPluginLog Log { get; private set; } = null!;
         private SimpleBlackjackIpc sbj { get; set; }
+        private bool ipcInitialized = false;
 
         private const string CommandName = "/drp";
 
@@ -41,6 +43,7 @@ namespace BetterDiscordRichPresence
 
         public Plugin()
         {
+            ECommonsMain.Init(PluginInterface, this, Module.DalamudReflector);
             Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             configWindow = new ConfigWindow(this);
             windowSystem.AddWindow(configWindow);
@@ -57,10 +60,25 @@ namespace BetterDiscordRichPresence
             ClientState.Login           += OnLogin;
             ClientState.Logout          += OnLogout;
             
-            sbj = new SimpleBlackjackIpc(
-                this,
-                IsUserLoggedIn
-            );
+            InitializeIpc();
+        }
+    
+        private void InitializeIpc() {
+            try
+            {
+                Log.Information("Initializing IPC for SimpleBlackjack...");
+            
+                sbj = new SimpleBlackjackIpc(
+                    this,
+                    IsUserLoggedIn
+                );
+                ipcInitialized = true;
+                Log.Information("IPC initialized.");
+            } catch (Exception ex)
+            {
+                Log.Error($"Failed to initialize IPC: {ex.Message}");
+                ipcInitialized = false;
+            }
         }
         
         internal bool IsUserLoggedIn()

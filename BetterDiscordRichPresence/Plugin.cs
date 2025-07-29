@@ -25,6 +25,7 @@ namespace BetterDiscordRichPresence
         [PluginService] private static IClientState ClientState { get; set; } = null!;
         [PluginService] private static IDataManager DataManager { get; set; } = null!;
         [PluginService] internal static IPluginLog Log { get; private set; } = null!;
+        private SimpleBlackjackIpc sbj { get; set; }
 
         private const string CommandName = "/drp";
 
@@ -36,6 +37,7 @@ namespace BetterDiscordRichPresence
         private bool pendingTerritoryUpdate;
         private DateTime territoryUpdateTime;
         private ExcelSheet<TerritoryType>? territories;
+        public Boolean IsHosting = false;
 
         public Plugin()
         {
@@ -54,8 +56,18 @@ namespace BetterDiscordRichPresence
             ClientState.TerritoryChanged += OnTerritoryChanged;
             ClientState.Login           += OnLogin;
             ClientState.Logout          += OnLogout;
+            
+            sbj = new SimpleBlackjackIpc(
+                this,
+                IsUserLoggedIn
+            );
         }
-
+        
+        internal bool IsUserLoggedIn()
+        {
+            return sbj.IsLoggedIn();
+        }
+        
         public void Dispose()
         {
             windowSystem.RemoveAllWindows();
@@ -105,7 +117,16 @@ namespace BetterDiscordRichPresence
         public void ToggleConfigUI() => configWindow.Toggle();
 
         private void OnCommand(string command, string args)
-            => UpdateRichPresence();
+        {
+            if (string.IsNullOrWhiteSpace(args))
+            {
+                ToggleConfigUI();
+            }
+            else if (args.Trim().Equals("refresh", StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateRichPresence();
+            }
+        }
 
         private void OnLogout(int type, int code)
         {
@@ -113,7 +134,7 @@ namespace BetterDiscordRichPresence
                 discordClient.ClearPresence();
         }
 
-        private void UpdateRichPresence()
+        internal void UpdateRichPresence()
         {
             if (discordClient == null || !discordClient.IsInitialized)
                 InitializeDiscord();
@@ -124,14 +145,23 @@ namespace BetterDiscordRichPresence
             var character = ClientState.LocalPlayer;
             if (character == null)
                 return;
+            
+            if (IsUserLoggedIn() && !IsHosting)
+            {
+                IsHosting = true;
+            }
+            else if (!IsUserLoggedIn() && IsHosting)
+            {
+                IsHosting = false;
+            }
 
             territories ??= DataManager.GetExcelSheet<TerritoryType>();
             var territory       = territories.GetRow(ClientState.TerritoryType);
             var territoryId = ClientState.TerritoryType;
             var territoryResolver = territories.First(row => row.RowId == territoryId);
-            string territoryName = (territory.PlaceName.Value.Name).ToString() ?? "Unknown Location";
-            int partySize       = GetPartySize();
-            string partyString  = partySize > 1 ? $" ({partySize} of 8)" : string.Empty;
+            var territoryName = (territory.PlaceName.Value.Name).ToString() ?? "Unknown Location";
+            var partySize       = GetPartySize();
+            var partyString  = partySize > 1 ? $" ({partySize} of 8)" : string.Empty;
 
             // Use zone-specific image if configured for this territory
             foreach (var z in Configuration.ZoneImages)
@@ -158,17 +188,22 @@ namespace BetterDiscordRichPresence
                 imageKey = "default";
             }
 
+            var useSbj = Configuration.SbjEnabled
+                         && !string.IsNullOrEmpty(Configuration.SbjImg)
+                         && !string.IsNullOrEmpty(Configuration.SbjText)
+                         && !string.IsNullOrEmpty(Configuration.SbjLocation)
+                         && IsHosting;
+
             var presence = new RichPresence
             {
-                Details    = $"{character.Name}{partyString}",
-                State      = $"in {territoryName}",
-                Assets     = new Assets
+                Details = useSbj ? Configuration.SbjText : $"{character.Name}{partyString}",
+                State   = useSbj ? Configuration.SbjLocation : $"in {territoryName}",
+                Assets  = new Assets
                 {
-                    LargeImageKey  = imageKey,
-                    LargeImageText = territoryName
+                    LargeImageKey  = useSbj ? Configuration.SbjImg : imageKey,
+                    LargeImageText = useSbj ? Configuration.SbjLocation : territoryName
                 },
-                
-                Timestamps = new Timestamps { Start = DateTime.UtcNow  },
+                Timestamps = new Timestamps { Start = useSbj ? startTime : DateTime.UtcNow },
             };
 
             var buttons = new List<Button>();
@@ -205,7 +240,7 @@ namespace BetterDiscordRichPresence
         private ZoneImage? FindZoneMatch(object territoryNameObj)
         {
             // Convert the incoming territoryName into an ordinary string
-            string territoryName = territoryNameObj?.ToString() ?? string.Empty;
+            var territoryName = territoryNameObj?.ToString() ?? string.Empty;
 
             foreach (var z in Configuration.ZoneImages)
             {

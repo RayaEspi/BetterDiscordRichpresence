@@ -1,17 +1,14 @@
 ﻿using System;
 using System.Numerics;
-using System.Collections.Generic;
 using Dalamud.Interface.Windowing;
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 
 namespace BetterDiscordRichPresence.Windows
 {
-    // Window for configuring BetterDiscordRichPresence settings
     public class ConfigWindow : Window, IDisposable
     {
         private readonly Configuration configuration;
 
-        // Initialize window properties and store configuration reference
         public ConfigWindow(Plugin plugin)
             : base("BetterDiscordRichPresence Settings###BDRP_Config")
         {
@@ -24,10 +21,8 @@ namespace BetterDiscordRichPresence.Windows
             configuration = plugin.Configuration;
         }
 
-        // No unmanaged resources to clean up
         public void Dispose() { }
 
-        // Draw UI each frame
         public override void Draw()
         {
             if (ImGui.BeginTabBar("SettingsTabs"))
@@ -54,7 +49,6 @@ namespace BetterDiscordRichPresence.Windows
             }
         }
 
-        // Renders button enablement and text/link fields
         private void DrawButtonSettings()
         {
             if (!ImGui.BeginTable("bd_config_table", 4, ImGuiTableFlags.SizingStretchProp))
@@ -114,10 +108,8 @@ namespace BetterDiscordRichPresence.Windows
             ImGui.EndTable();
         }
 
-        // Renders default image URL and zone-specific image entries in a table
         private void DrawImageSettings()
         {
-            // Default image URL
             ImGui.Text("Default Image URL");
             ImGui.SameLine();
             var imageUrl = configuration.ImageUrl ?? string.Empty;
@@ -128,11 +120,9 @@ namespace BetterDiscordRichPresence.Windows
             ImGui.Text("Zone Specific Images");
             ImGui.Separator();
 
-            // Add new zone entry button
             if (ImGui.Button("Add Zone"))
                 UpdateConfig(() => configuration.ZoneImages.Add(new ZoneImage()));
 
-            // Begin table for zone images
             if (ImGui.BeginTable("bd_zone_images_table", 4, ImGuiTableFlags.SizingFixedFit))
             {
                 ImGui.TableSetupColumn("Enabled", ImGuiTableColumnFlags.WidthFixed, 80f);
@@ -177,7 +167,6 @@ namespace BetterDiscordRichPresence.Windows
             }
         }
 
-        // Renders the Discord application ID field
         private void DrawGeneralSettings()
         {
             ImGui.Text("Discord Configuration");
@@ -197,7 +186,6 @@ namespace BetterDiscordRichPresence.Windows
             ImGui.TableSetupColumn("sbjText");
             ImGui.TableSetupColumn("sbjLocation");
 
-            // Button 1
             ImGui.TableNextRow();
             ImGui.TableSetColumnIndex(0);
             var isEnabled1 = configuration.SbjEnabled;
@@ -226,7 +214,6 @@ namespace BetterDiscordRichPresence.Windows
             ImGui.EndTable();
         }
 
-        // Saves configuration changes and persists to storage
         private void UpdateConfig(Action applyChanges)
         {
             applyChanges();

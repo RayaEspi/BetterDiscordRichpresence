@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Dalamud.NET.Sdk/12.0.2">
+<Project Sdk="Dalamud.NET.Sdk/13.0.0">
   <PropertyGroup>
-    <Version>0.0.0.1</Version>
+    <Version>1.0.0.8</Version>
     <Description>BetterDiscordRichPresence</Description>
     <PackageProjectUrl>https://github.com/goatcorp/BetterDiscordRichPresence</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
@@ -14,6 +14,16 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
+        <PackageReference Update="DalamudPackager" Version="13.0.0" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="ECommons" Version="3.0.0.17-api13" />
+    </ItemGroup>
+    
+    <ItemGroup>
         <Reference Include="Lumina">
             <HintPath>$(DalamudHooksDir)\Lumina.dll</HintPath>
             <Private>false</Private>
@@ -22,13 +32,17 @@
             <HintPath>$(DalamudHooksDir)\Lumina.Excel.dll</HintPath>
             <Private>false</Private>
         </Reference>
-    </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="DiscordRichPresence" Version="1.3.0.28" />
-  </ItemGroup>
-
-    <ItemGroup>
-        <PackageReference Include="ECommons" Version="3.0.0.6" />
+        <Reference Include="Newtonsoft.Json">
+            <HintPath>$(DalamudLibPath)Newtonsoft.Json.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Dalamud.Bindings.ImGui">
+            <Private>false</Private>
+            <HintPath>$(DalamudLibPath)\Dalamud.Bindings.ImGui.dll</HintPath>
+        </Reference>
+        <Reference Include="Dalamud.Bindings.ImPlot">
+            <Private>false</Private>
+            <HintPath>$(DalamudLibPath)\Dalamud.Bindings.ImPlot.dll</HintPath>
+        </Reference>
     </ItemGroup>
 </Project>
